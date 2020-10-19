@@ -16,6 +16,12 @@ for (const file of commandFiles) {
 const cooldowns = new Discord.Collection();
 
 client.once('ready', () => {
+  client.user.setPresence({
+    activity: {
+      name: 'Tidus laugh 24/7',
+      type: 'LISTENING',
+    },
+  });
 });
 
 client.on('message', (message) => {
