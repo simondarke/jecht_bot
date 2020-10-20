@@ -2,6 +2,7 @@ require('dotenv').config();
 const fs = require('fs');
 const Discord = require('discord.js');
 const { prefix, token } = require('./config.json');
+const { presenceSetter } = require('./utils/presence');
 
 const client = new Discord.Client();
 client.commands = new Discord.Collection();
@@ -16,13 +17,12 @@ for (const file of commandFiles) {
 const cooldowns = new Discord.Collection();
 
 client.once('ready', () => {
-  client.user.setPresence({
-    activity: {
-      name: 'Tidus laugh 24/7',
-      type: 'LISTENING',
-    },
-  });
+      let pres = setInterval(() => {
+        presenceData = presenceSetter();
+        client.user.setActivity(presenceData[1], { type: presenceData[0] });
+      }, 10 * 60 * 1000);
 });
+
 
 client.on('message', (message) => {
   if (!message.content.startsWith(prefix) || message.author.bot) return;
