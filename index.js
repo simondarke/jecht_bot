@@ -1,28 +1,30 @@
 require('dotenv').config();
 const fs = require('fs');
 const Discord = require('discord.js');
-const { prefix, token } = require('./config.json');
+const glob = require('glob');
+const { prefix } = require('./config.json');
 const { presenceSetter } = require('./utils/presence');
+const winston = require('./utils/logger.js');
 
 const client = new Discord.Client();
 client.commands = new Discord.Collection();
+const coolDowns = new Discord.Collection();
 
-const commandFiles = fs.readdirSync('./commands').filter((file) => file.endsWith('.js'));
-
-for (const file of commandFiles) {
-  const command = require(`./commands/${file}`);
+glob.sync('./commands/*.js').forEach((file) => {
+  const command = require(file);
   client.commands.set(command.name, command);
-}
-
-const cooldowns = new Discord.Collection();
-
-client.once('ready', () => {
-      let pres = setInterval(() => {
-        presenceData = presenceSetter();
-        client.user.setActivity(presenceData[1], { type: presenceData[0] });
-      }, 10 * 60 * 1000);
 });
 
+client.once('ready', () => {
+  winston.log('info', 'started up and ready');
+
+  setInterval(() => {
+    const presenceData = presenceSetter();
+    client.user.setActivity(presenceData[1], { type: presenceData[0] })
+      .then((r) => winston.log('info', r))
+      .catch((r) => winston.log('error', r));
+  }, 10 * 60 * 1000);
+});
 
 client.on('message', (message) => {
   if (!message.content.startsWith(prefix) || message.author.bot) return;
@@ -36,7 +38,9 @@ client.on('message', (message) => {
   if (!command) return;
 
   if (command.guildOnly && message.channel.type === 'dm') {
-    message.reply('I can\'t execute that command inside DMs!');
+    message.reply('I can\'t execute that command inside DMs!')
+      .then((r) => winston.info(r))
+      .catch((r) => winston.error(r));
   }
 
   if (command.args && !args.length) {
@@ -49,30 +53,33 @@ client.on('message', (message) => {
     message.channel.send(reply);
   }
 
-  if (!cooldowns.has(command.name)) {
-    cooldowns.set(command.name, new Discord.Collection());
+  if (!coolDowns.has(command.name)) {
+    coolDowns.set(command.name, new Discord.Collection());
   }
 
   const now = Date.now();
-  const timestamps = cooldowns.get(command.name);
-  const cooldownAmount = (command.cooldown || 3) * 1000;
+  const timestamps = coolDowns.get(command.name);
+  const coolDownAmount = (command.cooldown || 3) * 1000;
 
   if (timestamps.has(message.author.id)) {
-    const expirationTime = timestamps.get(message.author.id) + cooldownAmount;
+    const expirationTime = timestamps.get(message.author.id) + coolDownAmount;
 
     if (now < expirationTime) {
       const timeLeft = (expirationTime - now) / 1000;
-      return message.reply(`please wait ${timeLeft.toFixed(1)} more second(s) before reusing the \`${command.name}\` command.`);
+      message.reply(`please wait ${timeLeft.toFixed(1)} more second(s) before reusing the \`${command.name}\` command.`)
+        .then((r) => winston.info(r))
+        .catch((r) => winston.error(r));
     }
   }
 
   timestamps.set(message.author.id, now);
-  setTimeout(() => timestamps.delete(message.author.id), cooldownAmount);
+  setTimeout(() => timestamps.delete(message.author.id), coolDownAmount);
 
   try {
     command.execute(message, args);
   } catch (error) {
-    message.reply(`there was an error trying to execute that command! ${error.message}`);
+    message.reply(`there was an error trying to execute that command! ${error.message}`)
+      .then((r) => winston.error(`${r} + ${error.message}`));
   }
 });
 
