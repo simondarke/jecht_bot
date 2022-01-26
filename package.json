@@ -5,7 +5,7 @@
   "main": "index.js",
   "dependencies": {
     "discord.js": "^12.5.3",
-    "dotenv": "^8.2.0",
+    "dotenv": "^14.3.2",
     "glob": "^7.1.7",
     "winston": "^3.3.3"
   },
